@@ -59,15 +59,15 @@ def get_cash_ratio(etf_code):
 
     print(etf_code, "TEXT LENGTH:", len(text))
 
-    cash_match = re.search(
-        r"CASH\s+([0-9]+(?:\.[0-9]+)?)%",
-        text,
-        re.IGNORECASE
-    )
+cash_match = re.search(
+    r"(CASH|現金|現金及約當現金|Cash)[\s\S]{0,50}?([0-9]+(?:\.[0-9]+)?)%",
+    text,
+    re.IGNORECASE
+)
 
     if cash_match:
 
-        ratio = float(cash_match.group(1))
+        ratio = float(cash_match.group(2))
 
         print(etf_code, "CASH:", ratio)
 

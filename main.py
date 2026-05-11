@@ -1,7 +1,6 @@
 import os
 import re
 import requests
-from bs4 import BeautifulSoup
 
 ETF_LIST = ["00981A", "00881", "00878", "009816", "00757", "0056"]
 THRESHOLD = 0.1
@@ -24,13 +23,12 @@ def send_line_message(message):
     }
 
     response = requests.post(url, headers=headers, json=body)
-
     print("LINE status:", response.status_code)
     print("LINE response:", response.text)
 
 
 def get_cash_ratio(etf_code):
-    url = f"https://www.pocket.tw/etf/tw/{etf_code}/fundholding"
+    url = f"https://www.pocket.tw/etf//tw/{etf_code}/fundholding"
 
     headers = {
         "User-Agent": "Mozilla/5.0"
@@ -39,34 +37,21 @@ def get_cash_ratio(etf_code):
     response = requests.get(url, headers=headers, timeout=20)
     print(f"{etf_code} HTTP status:", response.status_code)
 
-    html = response.text
+    text = response.text
 
-    # 方法1：直接從網頁文字找 CASH / 現金
-    soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text(" ", strip=True)
+    # 嚴格抓 CASH 後面的百分比，例如：CASH. 5.45%
+    match = re.search(
+        r"CASH[\s\S]{0,80}?([0-9]+(?:\.[0-9]+)?)\s*%",
+        text,
+        re.IGNORECASE
+    )
 
-    patterns = [
-        r"CASH\s*([0-9]+(?:\.[0-9]+)?)\s*%",
-        r"現金\s*([0-9]+(?:\.[0-9]+)?)\s*%",
-        r"Cash\s*([0-9]+(?:\.[0-9]+)?)\s*%",
-    ]
+    if match:
+        ratio = float(match.group(1))
+        print(f"{etf_code} CASH ratio:", ratio)
+        return ratio
 
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            return float(match.group(1))
-
-    # 方法2：從 HTML 原始碼找 CASH 附近的百分比
-    cash_index = html.upper().find("CASH")
-
-    if cash_index != -1:
-        nearby = html[cash_index:cash_index + 1000]
-        match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*%", nearby)
-
-        if match:
-            return float(match.group(1))
-
-    print(f"{etf_code} 找不到 CASH / 現金比例")
+    print(f"{etf_code} 找不到 CASH 比例")
     return None
 
 
@@ -94,7 +79,6 @@ def main():
         message = "⚠️ ETF 現金比例異常\n\n"
         message += f"觸發條件：現金比例 ≥ {THRESHOLD:.1f}%\n\n"
         message += "\n".join(alerts)
-
         send_line_message(message)
     else:
         print("沒有 ETF 超過門檻，不發送 LINE")

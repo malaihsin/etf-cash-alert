@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 
 ETF_LIST = ["00981A", "00757"]
 
-THRESHOLD = 0.1
+THRESHOLD = 10
 
 LINE_ACCESS_TOKEN = os.getenv("LINE_ACCESS_TOKEN")
 LINE_USER_ID = os.getenv("LINE_USER_ID")

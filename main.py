@@ -1,34 +1,8 @@
-import requests
-from bs4 import BeautifulSoup
 import os
-
-ETF_LIST = ["00981A", "0050", "006208", "00878", "00919"]
-
-THRESHOLD = 0.1
+import requests
 
 LINE_ACCESS_TOKEN = os.getenv("LINE_ACCESS_TOKEN")
 LINE_USER_ID = os.getenv("LINE_USER_ID")
-
-
-def get_cash_ratio(etf_code):
-    url = f"https://www.pocket.tw/etf/tw/{etf_code}/fundholding"
-
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    text = soup.get_text()
-
-    lines = text.split("\n")
-
-    for i, line in enumerate(lines):
-        if "CASH" in line.upper():
-            try:
-                ratio = lines[i + 1].replace("%", "").strip()
-                return float(ratio)
-            except:
-                return None
-
-    return None
 
 
 def send_line_message(message):
@@ -49,25 +23,12 @@ def send_line_message(message):
         ]
     }
 
-    requests.post(url, headers=headers, json=body)
+    response = requests.post(url, headers=headers, json=body)
+
+    print("LINE status code:", response.status_code)
+    print("LINE response:", response.text)
 
 
-alerts = []
+send_line_message("✅ ETF Cash Alert 測試成功")
 
-for etf in ETF_LIST:
-    ratio = get_cash_ratio(etf)
-
-    print(etf, ratio)
-
-    if ratio and ratio >= THRESHOLD:
-        alerts.append(f"{etf}：{ratio:.2f}%")
-
-if alerts:
-    msg = "⚠️ ETF 現金比例異常\n\n"
-    msg += "\n".join(alerts)
-
-    send_line_message(msg)
-
-    print("LINE sent")
-else:
-    print("No alerts")
+print("Program finished")

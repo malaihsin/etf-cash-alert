@@ -1,8 +1,11 @@
 import os
 import re
+import time
 import requests
+from playwright.sync_api import sync_playwright
 
 ETF_LIST = ["00981A", "00881", "00878", "009816", "00757", "0056"]
+
 THRESHOLD = 0.1
 
 LINE_ACCESS_TOKEN = os.getenv("LINE_ACCESS_TOKEN")
@@ -10,6 +13,7 @@ LINE_USER_ID = os.getenv("LINE_USER_ID")
 
 
 def send_line_message(message):
+
     url = "https://api.line.me/v2/bot/message/push"
 
     headers = {
@@ -19,82 +23,108 @@ def send_line_message(message):
 
     body = {
         "to": LINE_USER_ID,
-        "messages": [{"type": "text", "text": message}]
+        "messages": [
+            {
+                "type": "text",
+                "text": message
+            }
+        ]
     }
 
     response = requests.post(url, headers=headers, json=body)
 
-    print("LINE status:", response.status_code)
-    print("LINE response:", response.text)
+    print("LINE:", response.status_code)
+    print(response.text)
 
 
 def get_cash_ratio(etf_code):
+
     url = f"https://www.pocket.tw/etf/tw/{etf_code}/fundholding/"
 
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
+    with sync_playwright() as p:
 
-    response = requests.get(url, headers=headers, timeout=20)
-    print(etf_code, "HTTP:", response.status_code)
+        browser = p.chromium.launch(headless=True)
 
-    text = response.text
+        page = browser.new_page()
 
-    print(etf_code, "HTML length:", len(text))
-    print(etf_code, "HTML preview:", text[:500])
+        print("OPEN:", url)
 
-    cash_pos = text.upper().find("CASH")
+        page.goto(url, timeout=60000)
 
-    if cash_pos == -1:
-        print(etf_code, "找不到 CASH")
-        return None
+        time.sleep(5)
 
-    snippet = text[cash_pos:cash_pos + 500]
-    print(etf_code, "CASH snippet:", snippet)
+        text = page.inner_text("body")
 
-    match = re.search(
-        r"CASH[\s\S]{0,500}?([0-9]+(?:\.[0-9]+)?)\s*%",
-        snippet,
+        browser.close()
+
+    print(etf_code, "TEXT LENGTH:", len(text))
+
+    cash_match = re.search(
+        r"CASH\s+([0-9]+(?:\.[0-9]+)?)%",
+        text,
         re.IGNORECASE
     )
 
-    if match:
-        ratio = float(match.group(1))
-        print(etf_code, "CASH ratio:", ratio)
+    if cash_match:
+
+        ratio = float(cash_match.group(1))
+
+        print(etf_code, "CASH:", ratio)
+
         return ratio
 
-    print(etf_code, "找到 CASH 但找不到百分比")
+    print(etf_code, "找不到 CASH")
+
     return None
 
 
 def main():
+
     alerts = []
     results = []
 
     for etf in ETF_LIST:
-        ratio = get_cash_ratio(etf)
 
-        if ratio is None:
-            results.append(f"{etf}：抓不到資料")
-            continue
+        try:
 
-        results.append(f"{etf}：{ratio:.2f}%")
+            ratio = get_cash_ratio(etf)
 
-        if ratio >= THRESHOLD:
-            alerts.append(f"{etf}：{ratio:.2f}%")
+            if ratio is None:
 
-    print("全部結果：")
-    for item in results:
-        print(item)
+                results.append(f"{etf}：抓不到資料")
+
+                continue
+
+            results.append(f"{etf}：{ratio:.2f}%")
+
+            if ratio >= THRESHOLD:
+
+                alerts.append(f"{etf}：{ratio:.2f}%")
+
+        except Exception as e:
+
+            print(etf, "ERROR:", str(e))
+
+            results.append(f"{etf}：錯誤")
+
+    print("RESULTS")
+
+    for r in results:
+        print(r)
 
     if alerts:
-        message = "⚠️ ETF 現金比例異常\n\n"
-        message += f"觸發條件：現金比例 ≥ {THRESHOLD:.1f}%\n\n"
-        message += "\n".join(alerts)
 
-        send_line_message(message)
+        msg = "⚠️ ETF 現金比例異常\n\n"
+
+        msg += f"觸發條件：現金比例 ≥ {THRESHOLD:.1f}%\n\n"
+
+        msg += "\n".join(alerts)
+
+        send_line_message(msg)
+
     else:
-        print("沒有 ETF 超過門檻，不發送 LINE")
+
+        print("沒有 ETF 超過門檻，不發 LINE")
 
 
 if __name__ == "__main__":

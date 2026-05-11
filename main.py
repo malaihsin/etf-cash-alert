@@ -4,7 +4,7 @@ import os
 
 ETF_LIST = ["00981A", "0050", "006208", "00878", "00919"]
 
-THRESHOLD = 10.0
+THRESHOLD = 0.1
 
 LINE_ACCESS_TOKEN = os.getenv("LINE_ACCESS_TOKEN")
 LINE_USER_ID = os.getenv("LINE_USER_ID")
